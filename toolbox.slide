@@ -1,0 +1,36 @@
+# Practical Toolbox for Data Manuplation:
+Noah Data Syncronization and Manuplation
+10 Nov 2022
+
+Dera(Dru-Go)
+Engineering Manager, NoahRealEstate
+deraadu.netlify.app
+
+
+## Begin with Requirements
+.code toolbox.feature
+
+## main function
+
+Organising / Architecting software is like organising a team.  
+Each team has a name (noun).  
+And each team is responsible for doing something (verb).
+
+
+## Document
+
+Software, like organisations, have things that change frequently
+and things that are stable.
+
+Document stable things in README.md.
+
+Document unstable things in a code walk-through.
+
+## README.md
+.code README.md
+
+## Code walk-through
+.link toolbox.article
+
+## Presentation and Code sources
+.link https://github.com/siuyin/developing_software
