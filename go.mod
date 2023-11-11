@@ -3,8 +3,13 @@ module github.com/dru-go/noah-toolbox
 go 1.20
 
 require (
-	github.com/yuin/goldmark v1.6.0 // indirect
-	golang.org/x/net v0.18.0 // indirect
-	golang.org/x/sys v0.14.0 // indirect
-	golang.org/x/tools v0.15.0 // indirect
+	github.com/bokwoon95/sq v0.4.4
+	github.com/google/uuid v1.4.0
+	github.com/spf13/cobra v1.8.0
+)
+
+require (
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
+	golang.org/x/crypto v0.15.0 // indirect
 )
