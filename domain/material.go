@@ -1,9 +1,10 @@
 package domain
 
 import (
-	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"math/rand"
 )
 
 type Material struct {
@@ -12,14 +13,16 @@ type Material struct {
 	Name        string `json:"name,omitempty"`
 	Category    string `json:"category,omitempty"`
 	Measurement string `json:"unitOfMeasurement,omitempty"`
+	CreatedAt   string `json:"CreatedAt,omitempty"`
 }
 
+func randInt(min, max int) []byte {
+	unique := min + rand.Intn(max-min)
+	return []byte(fmt.Sprint(unique))
+}
 func CreateUniqueMaterialId(category string) (string, error) {
-	b := make([]byte, 3) //equals 8 characters
-	rand.Read(b)
-
 	if !Validate(category) {
 		return "", errors.New("the provided category does not exist")
 	}
-	return hex.EncodeToString(b) + category, nil
+	return Identifier(category) + hex.EncodeToString(randInt(100, 999)), nil
 }

@@ -1,14 +1,17 @@
 package repository
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/bokwoon95/sq"
 	"github.com/dru-go/noah-toolbox/domain"
 	"github.com/google/uuid"
 )
 
-type MATERIAL struct {
+type MATERIALS struct {
 	sq.TableStruct
-	ID, MATERIAL_ID, NAME, CATEGORY, MEASUREMENT sq.StringField
+	ID, MATERIALID, NAME, CATEGORY, UNITOFMEASUREMENT, CREATEDAT, UPDATEDAT sq.StringField
 }
 
 type IMaterialRepository interface {
@@ -17,23 +20,24 @@ type IMaterialRepository interface {
 	Create(name, category, measurement string) (domain.Material, error)
 }
 
-func (m MATERIAL) Mapper() func(row *sq.Row) domain.Material {
+func (m MATERIALS) MaterialMapper() func(row *sq.Row) domain.Material {
 	return func(row *sq.Row) domain.Material {
 		return domain.Material{
 			Id:          row.StringField(m.ID),
 			Name:        row.StringField(m.NAME),
 			Category:    row.StringField(m.CATEGORY),
-			Measurement: row.StringField(m.MEASUREMENT),
+			Measurement: row.StringField(m.UNITOFMEASUREMENT),
+			CreatedAt:   row.StringField(m.CREATEDAT),
 		}
 	}
 }
 
 func (repo Repository) Exists(materialId string) (bool, error) {
-	material := sq.New[MATERIAL]("material")
+	material := sq.New[MATERIALS]("material")
 	query, err := sq.FetchExists(repo.Db, sq.
 		SelectOne().
 		From(material).
-		Where(material.MATERIAL_ID.EqString(materialId)).
+		Where(material.MATERIALID.EqString(materialId)).
 		SetDialect(sq.DialectMySQL),
 	)
 	if err != nil {
@@ -43,12 +47,12 @@ func (repo Repository) Exists(materialId string) (bool, error) {
 }
 
 func (repo Repository) Find(name string) (domain.Material, error) {
-	material := sq.New[MATERIAL]("material")
+	material := sq.New[MATERIALS]("material")
 	query, err := sq.FetchOne(repo.Db, sq.
 		From(material).
 		Where(material.NAME.EqString(name)).
 		SetDialect(sq.DialectMySQL),
-		material.Mapper(),
+		material.MaterialMapper(),
 	)
 	if err != nil {
 		return domain.Material{}, err
@@ -58,20 +62,21 @@ func (repo Repository) Find(name string) (domain.Material, error) {
 
 // Wrap in a transaction
 func (repo Repository) Create(name, category, measurement string) (domain.Material, error) {
-	material := sq.New[MATERIAL]("material")
+	material := sq.New[MATERIALS]("")
 	id := uuid.New().String()
-
+	created_at := time.Now().UTC()
 	newMaterialId, err := domain.CreateUniqueMaterialId(category)
 	if err != nil {
 		return domain.Material{}, err
 	}
 
-	_, err = sq.Exec(repo.Db, sq.
+	result, err := sq.Exec(sq.Log(repo.Db), sq.
 		InsertInto(material).
-		Columns(material.ID, material.MATERIAL_ID, material.NAME, material.CATEGORY, material.MEASUREMENT).
-		Values(id, newMaterialId, name, category, measurement),
+		Columns(material.ID, material.MATERIALID, material.NAME, material.CATEGORY, material.UNITOFMEASUREMENT, material.CREATEDAT, material.UPDATEDAT).
+		Values(id, newMaterialId, name, category, measurement, created_at.Format(DateFormat), time.Now().Format("0000-00-00 00:00:00")).SetDialect(sq.DialectMySQL),
 	)
 
+	fmt.Println("Results Created", result)
 	if err != nil {
 		return domain.Material{}, err
 	}
