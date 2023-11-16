@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -168,9 +169,12 @@ func (repo Repository) Fetch(filter domain.ComputeFilter) ([]domain.Transaction,
 
 func (repo Repository) BulkCreate(transactions []domain.Transaction) error {
 	transaction := sq.New[TRANSACTIONS]("")
-
-	// TODO: Wrap this in a database transaction
-	result, err := sq.Exec(sq.Log(repo.Db), sq.
+	tx, err := repo.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	result, err := sq.Exec(tx, sq.
 		InsertInto(transaction).
 		ColumnValues(transaction.Values(transactions)).SetDialect(sq.DialectMySQL),
 	)
@@ -178,19 +182,8 @@ func (repo Repository) BulkCreate(transactions []domain.Transaction) error {
 	if err != nil {
 		return err
 	}
-	return nil
-}
 
-func (repo Repository) BulkUpdatev2(transactions []domain.Transaction) error {
-	transaction := sq.New[TRANSACTIONS]("")
-
-	result, err := sq.Exec(sq.Log(repo.Db), sq.MySQL.
-		Queryf("UPDATE transaction SET balance = {}, unitPrice = {}, cumulative = {}, updatedAt = {} WHERE id = {}",
-			transaction.TransactionRowMapper(transactions),
-		).
-		SetDialect(sq.DialectMySQL),
-	)
-	fmt.Println(result.RowsAffected)
+	err = tx.Commit()
 	if err != nil {
 		return err
 	}
@@ -199,13 +192,18 @@ func (repo Repository) BulkUpdatev2(transactions []domain.Transaction) error {
 
 func (repo Repository) BulkUpdate(transactions []domain.Transaction) error {
 	transaction := sq.New[TRANSACTIONS]("")
+	tx, err := repo.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	tmp := sq.SelectValues{
 		Alias:     "tmp",
 		Columns:   []string{"id", "balance", "unitPrice", "cumulative", "updatedAt"},
 		RowValues: transaction.TransactionRowMapper(transactions),
 	}
 
-	result, err := sq.Exec(sq.Log(repo.Db), sq.MySQL.
+	result, err := sq.Exec(tx, sq.MySQL.
 		Update(transaction).
 		Join(tmp, tmp.Field("id").Eq(transaction.ID)).
 		Set(
@@ -216,6 +214,12 @@ func (repo Repository) BulkUpdate(transactions []domain.Transaction) error {
 		),
 	)
 	fmt.Println(result.RowsAffected)
+
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
 	if err != nil {
 		return err
 	}
