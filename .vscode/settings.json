@@ -6,6 +6,7 @@
         "TOTALPRICE",
         "TRANSACTIONTYPE",
         "UNITPRICE",
-        "UPDATEDAT"
+        "UPDATEDAT",
+        "UNITOFMEASUREMENT"
     ]
 }
