@@ -2,9 +2,11 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"testing"
 
 	"github.com/dru-go/noah-toolbox/domain"
+	"github.com/dru-go/noah-toolbox/utils"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 )
@@ -67,7 +69,7 @@ func TestRepository_Fetch(t *testing.T) {
 	}
 }
 
-func TestRepository_LastTransaction(t *testing.T) {
+func TestRepository_LastTransactionFetchSubsequentTransactions(t *testing.T) {
 	db, err := sql.Open("mysql", "root:admin@/cookbook")
 	if err != nil {
 		panic(err)
@@ -81,8 +83,8 @@ func TestRepository_LastTransaction(t *testing.T) {
 		args args
 	}{
 		{
-			name: "GetLast Transaction: Test with id",
-			args: args{id: "4dcf8cda-f2d2-4b8d-a386-7d6fdb8071bf"},
+			name: "Get Subsequent Transaction: Test with id",
+			args: args{id: "19c7b88e-ad80-427f-a15f-826f0b445294"},
 		},
 	}
 	for _, tt := range tests {
@@ -90,8 +92,9 @@ func TestRepository_LastTransaction(t *testing.T) {
 			repo := Repository{
 				Db: db,
 			}
-			_, err := repo.LastTransaction(tt.args.id)
-			// fmt.Println(prettyPrint(got))
+			got, err := repo.FetchSubsequentTransactions(tt.args.id)
+			fmt.Println(utils.PrettyPrint(got))
+			assert.Equal(t, len(got), 3)
 			assert.Nil(t, err)
 		})
 	}
@@ -115,7 +118,7 @@ func TestRepository_BulkCreate(t *testing.T) {
 				transactions: []domain.Transaction{
 					{
 						Id:              "4dcf8cda-f2d2-4b8d-a386-7d6fdb8071bk",
-						MaterialId:      "EL7274",
+						MaterialId:      "CN000019",
 						Project:         "cd0a2fdc-d4d0-4d1c-b6c2-d699eb178ede",
 						Company:         "78030b4b-2155-4991-be9d-68f200c5a99d",
 						TransactionType: "CREDIT",
@@ -131,7 +134,7 @@ func TestRepository_BulkCreate(t *testing.T) {
 					},
 					{
 						Id:              "4dcf8cda-f2d2-4b8d-a386-7d6fdb8071bl",
-						MaterialId:      "EL7274",
+						MaterialId:      "CN000019",
 						Project:         "cd0a2fdc-d4d0-4d1c-b6c2-d699eb178ede",
 						Company:         "78030b4b-2155-4991-be9d-68f200c5a99d",
 						TransactionType: "CREDIT",

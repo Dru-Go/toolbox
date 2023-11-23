@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -11,13 +13,14 @@ import (
 
 type MATERIALS struct {
 	sq.TableStruct
-	ID, MATERIALID, NAME, CATEGORY, UNITOFMEASUREMENT, CREATEDAT, UPDATEDAT sq.StringField
+	ID, MATERIALID, NAME, DESCRIPTION, CATEGORY, UNITOFMEASUREMENT, CREATEDAT, UPDATEDAT sq.StringField
 }
 
 type IMaterialRepository interface {
 	Find(name string) (domain.Material, error)
 	Exists(materialId string) (bool, error)
 	Create(name, category, measurement string) (domain.Material, error)
+	Import(string, []domain.Material) error
 }
 
 func (m MATERIALS) MaterialMapper() func(row *sq.Row) domain.Material {
@@ -25,9 +28,31 @@ func (m MATERIALS) MaterialMapper() func(row *sq.Row) domain.Material {
 		return domain.Material{
 			Id:          row.StringField(m.ID),
 			Name:        row.StringField(m.NAME),
+			MaterialId:  row.StringField(m.MATERIALID),
+			Description: row.StringField(m.DESCRIPTION),
 			Category:    row.StringField(m.CATEGORY),
 			Measurement: row.StringField(m.UNITOFMEASUREMENT),
 			CreatedAt:   row.StringField(m.CREATEDAT),
+		}
+	}
+}
+
+func (mt MATERIALS) Values(repo *sql.DB, category string, materials []domain.Material) func(col *sq.Column) {
+	materialId, err := domain.CountMaterialWithCategory(repo, category)
+	return func(col *sq.Column) {
+		for i, m := range materials {
+			if err != nil {
+				fmt.Printf("Error creating a unique id for material, %v", m)
+				return
+			}
+			col.SetString(mt.ID, uuid.New().String())
+			col.SetString(mt.MATERIALID, fmt.Sprintf("%s%06d", domain.Identifier(category), materialId+1+i))
+			col.SetString(mt.NAME, m.Name)
+			col.SetString(mt.DESCRIPTION, m.Description)
+			col.SetString(mt.CATEGORY, category)
+			col.SetString(mt.UNITOFMEASUREMENT, m.Measurement)
+			col.SetString(mt.CREATEDAT, time.Now().UTC().Format(DateFormat))
+			col.SetString(mt.UPDATEDAT, time.Now().Format("0000-00-00 00:00:00"))
 		}
 	}
 }
@@ -65,11 +90,14 @@ func (repo Repository) Create(name, category, measurement string) (domain.Materi
 	material := sq.New[MATERIALS]("")
 	id := uuid.New().String()
 	created_at := time.Now().UTC()
-	newMaterialId, err := domain.CreateUniqueMaterialId(category)
+
+	count, err := domain.CountMaterialWithCategory(repo.Db, category)
+	newMaterialId := fmt.Sprintf("%s%06d", domain.Identifier(category), count+1)
 	if err != nil {
 		return domain.Material{}, err
 	}
 
+	fmt.Printf("Count of materials with category %s is %v \n", category, count)
 	result, err := sq.Exec(sq.Log(repo.Db), sq.
 		InsertInto(material).
 		Columns(material.ID, material.MATERIALID, material.NAME, material.CATEGORY, material.UNITOFMEASUREMENT, material.CREATEDAT, material.UPDATEDAT).
@@ -81,5 +109,28 @@ func (repo Repository) Create(name, category, measurement string) (domain.Materi
 		return domain.Material{}, err
 	}
 
-	return domain.Material{Id: id, Name: name, MaterialId: newMaterialId, Category: category, Measurement: measurement}, nil
+	return domain.Material{Id: id, Name: name, MaterialId: fmt.Sprint(count), Category: category, Measurement: measurement}, nil
+}
+
+func (repo Repository) Import(category string, materials []domain.Material) error {
+	material := sq.New[MATERIALS]("")
+	tx, err := repo.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	result, err := sq.Exec(tx, sq.
+		InsertInto(material).
+		ColumnValues(material.Values(repo.Db, category, materials)).SetDialect(sq.DialectMySQL),
+	)
+	fmt.Println(result.RowsAffected)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
 }

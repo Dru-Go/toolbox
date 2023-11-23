@@ -25,7 +25,7 @@ type TRANSACTIONS struct {
 }
 
 type ITransactionRepository interface {
-	LastTransaction(id string) (domain.Transaction, error)
+	FetchSubsequentTransactions(id string) ([]domain.Transaction, error)
 	Fetch(domain.ComputeFilter) ([]domain.Transaction, error)
 	BulkCreate([]domain.Transaction) error
 	BulkUpdate([]domain.Transaction) error
@@ -62,6 +62,7 @@ func (m TRANSACTIONS) TransactionMapper() func(row *sq.Row) domain.Transaction {
 func (ts TRANSACTIONS) Values(transactions []domain.Transaction) func(col *sq.Column) {
 	created_at := time.Now().UTC()
 	return func(col *sq.Column) {
+
 		for _, t := range transactions {
 			col.SetString(ts.ID, uuid.New().String())
 			col.SetString(ts.MATERIALID, t.MaterialId)
@@ -98,28 +99,27 @@ func (m TRANSACTIONS) TransactionRowMapper(transactions []domain.Transaction) []
 }
 
 // NOTE id should be validated
-func (repo Repository) LastTransaction(id string) (domain.Transaction, error) {
+func (repo Repository) FetchSubsequentTransactions(id string) ([]domain.Transaction, error) {
 	transaction := sq.New[TRANSACTIONS]("transaction")
-	var non_deleted = transaction.DELETEDAT.IsNull()
+	var non_deleted = transaction.DELETEDAT.EqString("0000-00-00 00:00:00")
 
-	selected, err := sq.FetchOne(sq.Log(repo.Db), sq.
+	selected, err := sq.FetchOne(repo.Db, sq.
 		From(transaction).
 		Where(transaction.ID.EqString(id), non_deleted).
 		SetDialect(sq.DialectMySQL),
 		transaction.TransactionMapper(),
 	)
 	if err != nil && err != sql.ErrNoRows {
-		return selected, err
+		return []domain.Transaction{selected}, err
 	}
 	// Get the selected transaction, the compute the previous based on the date
-	query, err := sq.FetchOne(repo.Db, sq.
+	query, err := sq.FetchAll(sq.Log(repo.Db), sq.
 		From(transaction).
 		Where(transaction.COMPANY.EqString(selected.Company),
 			transaction.PROJECT.EqString(selected.Project),
 			transaction.MATERIALID.EqString(selected.MaterialId),
-			sq.Expr("createdAt < {}", selected.CreatedAt),
+			sq.Expr("transaction.createdat >= STR_TO_DATE({}, '%Y-%m-%d %H:%i:%s')", selected.CreatedAt),
 			non_deleted).
-		GroupBy(transaction.CREATEDAT.Desc()).
 		SetDialect(sq.DialectMySQL),
 		transaction.TransactionMapper(),
 	)
@@ -133,7 +133,7 @@ func (repo Repository) LastTransaction(id string) (domain.Transaction, error) {
 
 func (repo Repository) Fetch(filter domain.ComputeFilter) ([]domain.Transaction, error) {
 	transaction := sq.New[TRANSACTIONS]("transactions")
-	var non_deleted = transaction.DELETEDAT.IsNull()
+	var non_deleted = transaction.DELETEDAT.EqString("0000-00-00 00:00:00")
 	var filters []sq.Predicate = []sq.Predicate{non_deleted}
 
 	if len(filter.Ids) > 0 {
@@ -142,6 +142,12 @@ func (repo Repository) Fetch(filter domain.ComputeFilter) ([]domain.Transaction,
 
 	if filter.MaterialId != "" {
 		filters = append(filters, transaction.MATERIALID.EqString(filter.MaterialId))
+	}
+	if filter.Company != "" {
+		filters = append(filters, transaction.COMPANY.EqString(filter.Company))
+	}
+	if filter.Project != "" {
+		filters = append(filters, transaction.PROJECT.EqString(filter.Project))
 	}
 
 	if filter.Date.StartDate != "" || filter.Date.EndDate != "" {
@@ -157,7 +163,7 @@ func (repo Repository) Fetch(filter domain.ComputeFilter) ([]domain.Transaction,
 	query, err := sq.FetchAll(sq.Log(repo.Db), sq.
 		From(transaction).
 		Where(filters...).
-		GroupBy(transaction.CREATEDAT.Desc()).
+		OrderBy(transaction.CREATEDAT.Asc()).
 		SetDialect(sq.DialectMySQL),
 		transaction.TransactionMapper(),
 	)
@@ -203,7 +209,7 @@ func (repo Repository) BulkUpdate(transactions []domain.Transaction) error {
 		RowValues: transaction.TransactionRowMapper(transactions),
 	}
 
-	result, err := sq.Exec(tx, sq.MySQL.
+	_, err = sq.Exec(tx, sq.MySQL.
 		Update(transaction).
 		Join(tmp, tmp.Field("id").Eq(transaction.ID)).
 		Set(
@@ -213,7 +219,6 @@ func (repo Repository) BulkUpdate(transactions []domain.Transaction) error {
 			transaction.UPDATEDAT.Set(tmp.Field("updatedAt")),
 		),
 	)
-	fmt.Println(result.RowsAffected)
 
 	if err != nil {
 		return err
