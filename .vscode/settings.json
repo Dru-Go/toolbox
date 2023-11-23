@@ -1,12 +1,14 @@
 {
     "cSpell.words": [
         "CREATEDAT",
+        "csvreader",
         "DELETEDAT",
         "MATERIALID",
+        "Subrouter",
         "TOTALPRICE",
         "TRANSACTIONTYPE",
+        "UNITOFMEASUREMENT",
         "UNITPRICE",
-        "UPDATEDAT",
-        "UNITOFMEASUREMENT"
+        "UPDATEDAT"
     ]
 }
