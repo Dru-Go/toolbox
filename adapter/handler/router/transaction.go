@@ -26,7 +26,7 @@ func ImportTransactionHandler(usecase usecase.ITransactionUsecase) HandleFunc {
 			fmt.Fprintf(w, "Error Importing the transactions, %s", err.Error())
 			return
 		}
-
+		fmt.Fprintf(w, "Successfully Saved ... %v records", len(transactions))
 	}
 }
 
@@ -53,6 +53,11 @@ func ComputeTransactionHandler(usecase usecase.ITransactionUsecase) HandleFunc {
 			return
 		}
 		transactions = usecase.BulkCompute(transactions)
+		if r.URL.Query().Has("save") {
+			fmt.Fprintf(w, "Saving to database ... %v records", len(transactions))
+			usecase.BulkUpdate(transactions)
+			return
+		}
 		util.WriteResponse[domain.Transactions](w, transactions)
 	}
 }
