@@ -19,15 +19,16 @@ type TransactionUsecase struct {
 }
 
 type ITransactionUsecase interface {
+	Find(domain.ComputeFilter) ([]domain.Transaction, error)
 	LoadCSV(filepath string) ([]domain.Transaction, error)
 	BulkImport([]domain.Transaction) error
 	BulkCompute([]domain.Transaction) []domain.Transaction
 	BulkUpdate([]domain.Transaction) error
-	LoadTransactions(filepath string)
+	LoadTransactions([]domain.Transaction)
 }
 
 // PrintTable prints a table of transactions using go-pretty table.
-func (t TransactionUsecase) printTable(transactions []domain.Transaction) {
+func (t TransactionUsecase) LoadTransactions(transactions []domain.Transaction) {
 	// Create a new table
 	tw := table.NewWriter()
 	tw.SetOutputMirror(os.Stdout)
@@ -70,13 +71,22 @@ func (t TransactionUsecase) printTable(transactions []domain.Transaction) {
 	tw.Render()
 }
 
+func (t TransactionUsecase) Find(filters domain.ComputeFilter) ([]domain.Transaction, error) {
+	transactions, err := t.Repo.Fetch(filters)
+	if err != nil {
+		return []domain.Transaction{}, fmt.Errorf("unable to filter the transactions with the provided filter %v, %s", filters, err)
+	}
+	t.LoadTransactions(transactions)
+	return transactions, nil
+}
+
 func (t TransactionUsecase) LoadCSV(filepath string) ([]domain.Transaction, error) {
 	csvReader := repository.NewCSVReader(filepath)
 	transactions, err := repository.ReadCSV[domain.Transaction](csvReader)
 	if err != nil {
 		return []domain.Transaction{}, fmt.Errorf("unable to parse the csv file, %s", err)
 	}
-	t.printTable(transactions)
+	t.LoadTransactions(transactions)
 	return transactions, nil
 }
 
@@ -120,13 +130,14 @@ func (tr TransactionUsecase) FindLinkedTransaction(transactionId, materialId str
 			return fmt.Errorf("error Fetching transactions with transaction id %s, %v", transactionId, err)
 		}
 	}
-	tr.printTable(transactions)
+	tr.LoadTransactions(transactions)
 	return nil
 }
 
 func (tr TransactionUsecase) BulkUpdate(transactions []domain.Transaction) error {
 	return tr.Repo.BulkUpdate(transactions)
 }
+
 func (tr TransactionUsecase) BulkCompute(transactions []domain.Transaction) []domain.Transaction {
 	if transactions[0].Balance == 0 {
 		transactions[0].Balance = transactions[0].Received
@@ -193,7 +204,7 @@ func (tr TransactionUsecase) BulkCompute(transactions []domain.Transaction) []do
 		)
 		transactions[i].TransactionType = getTransactionType(transactions[i])
 	}
-	tr.printTable(transactions)
+	tr.LoadTransactions(transactions)
 
 	return transactions
 }

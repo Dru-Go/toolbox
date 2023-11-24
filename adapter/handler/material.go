@@ -15,7 +15,8 @@ func NewMaterial(usecase usecase.IMaterialUsecase) MaterialHandler {
 	}
 }
 
-func (mh MaterialHandler) Create(name, category, measurement string) domain.Material {
+func (mh MaterialHandler) Create(name, category, measurement string) (domain.Material, error) {
 	// Validate
-	return mh.Usecase.Create(name, category, measurement)
+	// mh.Usecase.Create(name, category, measurement)
+	return domain.Material{}, nil
 }

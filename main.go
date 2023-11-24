@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/dru-go/noah-toolbox/adapter/handler/router"
 	"github.com/dru-go/noah-toolbox/adapter/repository"
 	"github.com/dru-go/noah-toolbox/constant"
 	"github.com/dru-go/noah-toolbox/domain"
@@ -259,6 +260,10 @@ func main() {
 				Name:    "serve",
 				Aliases: []string{"s"},
 				Usage:   "serve the server locally port :3400",
+				Action: func(ctx *cli.Context) error {
+					router.SetupRouter(mu, tu)
+					return nil
+				},
 			},
 			{
 				Name:    "report",

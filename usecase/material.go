@@ -16,12 +16,13 @@ type MaterialUsecase struct {
 }
 type IMaterialUsecase interface {
 	Find()
-	Exists()
-	Create(name, category, measurement string) domain.Material
-	BulkImport(file string) error
-	LoadMaterials(file string)
+	Exists(string) (bool, error)
+	Create(name, category, measurement string) (domain.Material, error)
+	BulkImport(file, category string) error
+	LoadMaterials([]domain.Material) // NOTE replace the method name to Load
 }
 
+func (mu MaterialUsecase) Find() {}
 func (mu MaterialUsecase) Exists(materialId string) (bool, error) {
 	exists, err := mu.Repo.Exists(materialId)
 	if err != nil {
@@ -58,11 +59,11 @@ func (mu MaterialUsecase) LoadCSV(filepath string) error {
 	if err != nil {
 		return fmt.Errorf("unable to parse the csv file, %s", err)
 	}
-	mu.printTable(materials)
+	mu.LoadMaterials(materials)
 	return nil
 }
 
-func (m MaterialUsecase) printTable(materials []domain.Material) {
+func (m MaterialUsecase) LoadMaterials(materials []domain.Material) {
 	// Create a new table
 	tw := table.NewWriter()
 	tw.SetOutputMirror(os.Stdout)

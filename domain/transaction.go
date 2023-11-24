@@ -30,6 +30,8 @@ type Transaction struct {
 	DeletedAt       string `csv:"DELETED_AT,omitempty"`
 }
 
+type Transactions []Transaction
+
 type DateFilter struct {
 	StartDate string
 	EndDate   string
